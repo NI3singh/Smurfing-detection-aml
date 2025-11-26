@@ -1,0 +1,15 @@
+# Data Manipulation
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Synthetic Data Generation
+Faker>=19.0.0
+
+# Machine Learning & AI
+scikit-learn>=1.3.0
+shap>=0.42.1  # For Model Explainability
+
+# API (Same as IP module)
+fastapi
+uvicorn[standard]
+pydantic
