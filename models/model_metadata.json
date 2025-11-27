@@ -1,0 +1,18 @@
+{
+    "feature_names": [
+        "structuring_count",
+        "amount_std_dev",
+        "round_number_ratio",
+        "flow_ratio",
+        "distinct_counterparties",
+        "wager_ratio",
+        "win_loss_ratio",
+        "unique_device_count",
+        "unique_ip_count",
+        "night_owl_ratio",
+        "velocity_24h",
+        "avg_transaction_amount"
+    ],
+    "model_version": "1.0.0",
+    "threshold": -0.5350514393990669
+}

@@ -1,17 +1,29 @@
 """
-Phase 3, Step 1: Data Preprocessing & Splitting Strategy.
-Prepares the 12-dimensional feature set for Anomaly Detection.
+Phase 3, Step 2: The Model Pipeline (Isolation Forest)
+We will initialize the Isolation Forest algorithm.
+Why: It is efficient, handles high-dimensional data (our 12 features) well, and doesn't require a balanced dataset.
+Configuration: We won't just use default settings. We will tune:
+n_estimators (Number of trees).
+max_samples (How much data each tree sees).
+contamination (Expected fraud rate).
+
 """
 
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import IsolationForest
+from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support
+import joblib
+import shap
+import json
 import os
 import sys
 
 # Ensure we can run from any directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "../data/processed/features.csv")
+MODEL_DIR = os.path.join(BASE_DIR, "../models")
 
 def load_and_sanitize_data(filepath):
     """
@@ -104,14 +116,106 @@ def perform_stratified_split(df, features, test_size=0.2):
     
     return X_train, X_test, y_test
 
-if __name__ == "__main__":
-    # 1. Load
-    full_df, X_features, metadata = load_and_sanitize_data(DATA_PATH)
+def train_isolation_forest(X_train, contamination):
+    """
+    Step 2: Initialize and Train the Model.
+    """
+    print("\n🤖 Initializing Isolation Forest...")
     
-    # 2. Contamination
+    # Tuned Hyperparameters for Financial Fraud
+    model = IsolationForest(
+        n_estimators=200,        # More trees = more stable decision boundaries
+        max_samples=256,         # Classic IF setting (limit sample size per tree)
+        contamination=contamination, # The exact % of fraud we expect
+        random_state=42,
+        n_jobs=-1                # Use all CPU cores
+    )
+    
+    print("   Training model on Normal Behavior...")
+    model.fit(X_train)
+    print("   ✓ Training Complete.")
+    
+    return model
+
+def evaluate_model(model, X_test, y_test):
+    """
+    Evaluates how well the model catches Smurfs it has NEVER seen before.
+    """
+    print("\nscale⚖️ Evaluating Model Performance...")
+    
+    # Predict (Returns -1 for Outlier, 1 for Inlier)
+    y_pred_iso = model.predict(X_test)
+    
+    # Convert IF output (-1/1) to our Binary Label (1/0)
+    # -1 (Anomaly) -> 1 (Smurf)
+    #  1 (Normal)  -> 0 (Normal)
+    y_pred = [1 if x == -1 else 0 for x in y_pred_iso]
+    
+    # Metrics
+    print("\nConfusion Matrix:")
+    print(confusion_matrix(y_test, y_pred))
+    
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred, target_names=['Normal', 'Smurf']))
+    
+    precision, recall, _, _ = precision_recall_fscore_support(y_test, y_pred, average='binary')
+    
+    print(f"🎯 Smurf Detection Rate (Recall): {recall:.2%}")
+    print(f"🛡️ False Alarm Rate (1 - Precision): {1 - precision:.2%}")
+
+    return recall
+
+def train_shap_explainer(model):
+    """Step 4: Train SHAP Explainer for Interpretation."""
+    print("\n🧠 Initializing SHAP Explainer...")
+    # TreeExplainer is highly optimized for Isolation Forests
+    explainer = shap.TreeExplainer(model)
+    print("   ✓ Explainer ready.")
+    return explainer
+
+def save_artifacts(model, explainer, feature_names):
+    
+    """Saves the trained model to disk."""
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    model_path = os.path.join(MODEL_DIR, "isolation_forest.pkl")
+    explainer_path = os.path.join(MODEL_DIR, "shap_explainer.pkl")
+    
+    # 1. Save Model
+    joblib.dump(model, model_path)
+    print(f"\n💾 Model saved to: {model_path}")
+
+    # 2. Save Explainer
+    joblib.dump(explainer, explainer_path)
+    print(f"\n💾 Explainer saved to: {explainer_path}")
+
+    metadata = {
+        "feature_names": list(feature_names),
+        "model_version": "1.0.0",
+        "threshold": float(model.offset_) # The decision boundary score
+    }
+    with open(os.path.join(MODEL_DIR, "model_metadata.json"), "w") as f:
+        json.dump(metadata, f, indent=4)
+
+if __name__ == "__main__":
+    # 1. Load & Prep
+    full_df, X_features, metadata = load_and_sanitize_data(DATA_PATH)
     contamination = calculate_contamination(metadata)
     
-    # 3. Split
+    # 2. Split
     X_train, X_test, y_test = perform_stratified_split(full_df, X_features)
     
-    print("\n✅ Step 1 Complete. Data is ready for Isolation Forest.")
+    # 3. Train
+    model = train_isolation_forest(X_train, contamination)
+    
+    # 4. Evaluate
+    recall = evaluate_model(model, X_test, y_test)
+    
+    # 5. Explainability (Only if model is good)
+    if recall > 0.8:
+        explainer = train_shap_explainer(model)
+        
+        # 6. Save Everything
+        save_artifacts(model, explainer, X_features.columns)
+        print("\n✅ Phase 3 Complete. Ready for Inference API.")
+    else:
+        print("\n❌ Model performance too low. Aborting save.")
