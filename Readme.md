@@ -65,52 +65,6 @@ A "Black Box" model is useless for compliance. We integrate **SHAP (SHapley Addi
 
 ---
 
-## 🚀 Installation & Usage
-
-### 1. Setup Environment
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Generate Synthetic Data
-
-Run the Agent-Based Simulator to create the raw transaction logs.
-
-```bash
-python simulation/generator.py
-```
-
-### 3. Feature Engineering & Training
-
-Process the raw data into behavioral features and train the Isolation Forest model.
-
-```bash
-python simulation/train_model.py
-```
-
-Artifacts (model, explainer, metadata) will be saved to the `models/` directory.
-
-### 4. Run the Inference API
-
-Start the real-time prediction service.
-
-```bash
-python -m app.main
-```
-
-**Endpoint:** `POST /api/v1/analyze_user`
-
-**Payload:**
-
-```json
-{
-  "user_id": "USER_12345"
-}
-```
-
----
-
 ## 📊 Dataset Statistics
 
 The current model is validated against a dataset with the following distribution:
