@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # Container 1: The Database (Memory)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Container 2: Your Code
+  api:
+    build: .
+    ports:
+      - "8000:80"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # Mount the models folder so the API can see the trained brain
+    volumes:
+      - ./app/models:/code/app/models
+
+volumes:
+  redis_data:
